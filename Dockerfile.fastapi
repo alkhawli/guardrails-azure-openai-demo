@@ -1,0 +1,43 @@
+FROM python:3.11-slim
+
+ARG GUARDRAILS_TOKEN
+
+WORKDIR /app
+
+# Install essential build dependencies and pip-based poetry
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    python3-dev \
+    gcc \
+    g++ \
+    make \
+ && pip install --no-cache-dir poetry==1.8.3 \
+ && rm -rf /var/lib/apt/lists/*
+
+# Check Poetry installation
+RUN poetry --version
+
+# Disable virtual environments for Poetry
+RUN poetry config virtualenvs.create false
+
+# Copy Poetry files
+COPY pyproject.toml poetry.lock ./
+
+# Install dependencies
+RUN poetry config virtualenvs.create false \
+    && poetry install --only main --no-root --no-interaction --no-ansi
+
+# Copy FastAPI app code
+COPY ./app ./app
+
+
+# Run guardrails commands securely with token from ARG
+RUN poetry run guardrails configure --disable-metrics --disable-remote-inferencing --token="$GUARDRAILS_TOKEN" && \
+    poetry run guardrails hub install hub://guardrails/ban_list && \
+    poetry run guardrails hub install hub://guardrails/competitor_check && \
+    poetry run guardrails hub install hub://guardrails/gibberish_text
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
