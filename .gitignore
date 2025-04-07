@@ -127,3 +127,4 @@ cython_debug/
 .env
 .vscode/
 .venv/
+.DS_Store
